@@ -24,14 +24,6 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v1
 
-      - name: Run Trivy security scan
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-southeast-1.amazonaws.com/thales-app:latest
-          format: table
-          exit-code: 0
-          severity: CRITICAL,HIGH
-
       - name: Build Docker image
         run: |
           docker build -t thales-app ./app/
@@ -41,16 +33,31 @@ jobs:
           docker tag thales-app:latest ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-southeast-1.amazonaws.com/thales-app:latest
           docker push ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-southeast-1.amazonaws.com/thales-app:latest
 
+      - name: Run Trivy security scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-southeast-1.amazonaws.com/thales-app:latest
+          format: table
+          exit-code: 0
+          severity: CRITICAL,HIGH
+
       - name: Deploy via Ansible
         env:
           EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
           EC2_HOST: ${{ secrets.EC2_HOST }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
         run: |
+          pip install ansible
           echo "$EC2_SSH_KEY" > /tmp/deploy_key
           chmod 600 /tmp/deploy_key
           cd ansible
           sed -i "s/[0-9]\+\.[0-9]\+\.[0-9]\+\.[0-9]\+/$EC2_HOST/" inventory.ini
           ansible-playbook -i inventory.ini playbook.yml \
             --private-key /tmp/deploy_key \
-            -u ubuntu
+            -u ubuntu \
+            -e "AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID" \
+            -e "AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY" \
+            -e "AWS_ACCOUNT_ID=$AWS_ACCOUNT_ID"
           rm -f /tmp/deploy_key
