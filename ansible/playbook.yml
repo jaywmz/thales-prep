@@ -49,6 +49,17 @@
         name: ubuntu
         groups: docker
         append: yes
+    
+    - name: Add dd-agent user to docker group
+      user:
+        name: dd-agent
+        groups: docker
+        append: yes
+    
+    - name: Restart Datadog agent
+      service:
+        name: datadog-agent
+        state: restarted
       
     - name: Install Datadog agent
       include_role:
