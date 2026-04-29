@@ -123,10 +123,20 @@ resource "aws_instance" "main" {
   }
 }
 
+# Elastic IP
+resource "aws_eip" "main" {
+  instance = aws_instance.main.id
+  domain   = "vpc"
+  tags = {
+    Name = "thales-prep-eip"
+  }
+}
+
 # ECR Repository
 resource "aws_ecr_repository" "main" {
   name                 = "thales-app"
   image_tag_mutability = "MUTABLE"
+  force_delete         = true
 
   image_scanning_configuration {
     scan_on_push = true
