@@ -3,6 +3,9 @@
   hosts: webserver
   become: yes
 
+  vars:
+    ecr_url: "{{ lookup('env', 'AWS_ACCOUNT_ID') }}.dkr.ecr.ap-southeast-1.amazonaws.com"
+
   tasks:
     - name: Update apt packages
       apt:
@@ -16,6 +19,7 @@
           - curl
           - software-properties-common
           - python3-pip
+          - awscli
         state: present
 
     - name: Add Docker GPG key
@@ -46,16 +50,19 @@
         groups: docker
         append: yes
 
-    - name: Copy app files to EC2
-      copy:
-        src: ../app/
-        dest: /home/ubuntu/app/
-        owner: ubuntu
-        group: ubuntu
-        mode: '0755'
+    - name: Login to ECR
+      shell: |
+        aws ecr get-login-password --region ap-southeast-1 | docker login --username AWS --password-stdin {{ ecr_url }}
+      environment:
+        AWS_ACCESS_KEY_ID: "{{ lookup('env', 'AWS_ACCESS_KEY_ID') }}"
+        AWS_SECRET_ACCESS_KEY: "{{ lookup('env', 'AWS_SECRET_ACCESS_KEY') }}"
+        AWS_DEFAULT_REGION: "ap-southeast-1"
 
-    - name: Build Docker image
-      command: docker build -t thales-app /home/ubuntu/app/
+    - name: Pull Docker image from ECR
+      command: docker pull {{ ecr_url }}/thales-app:latest
+      environment:
+        AWS_ACCESS_KEY_ID: "{{ lookup('env', 'AWS_ACCESS_KEY_ID') }}"
+        AWS_SECRET_ACCESS_KEY: "{{ lookup('env', 'AWS_SECRET_ACCESS_KEY') }}"
 
     - name: Stop existing container if running
       command: docker stop thales-app
@@ -66,4 +73,4 @@
       ignore_errors: yes
 
     - name: Run Docker container
-      command: docker run -d -p 5000:5000 --name thales-app thales-app
+      command: docker run -d -p 5000:5000 --name thales-app {{ ecr_url }}/thales-app:latest

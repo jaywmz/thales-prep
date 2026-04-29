@@ -123,6 +123,25 @@ resource "aws_instance" "main" {
   }
 }
 
+# ECR Repository
+resource "aws_ecr_repository" "main" {
+  name                 = "thales-app"
+  image_tag_mutability = "MUTABLE"
+
+  image_scanning_configuration {
+    scan_on_push = true
+  }
+
+  tags = {
+    Name = "thales-prep-ecr"
+  }
+}
+
+# Output ECR URL
+output "ecr_repository_url" {
+  value = aws_ecr_repository.main.repository_url
+}
+
 # Output the public IP
 output "ec2_public_ip" {
   value = aws_instance.main.public_ip
