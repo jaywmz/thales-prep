@@ -64,12 +64,8 @@
         AWS_ACCESS_KEY_ID: "{{ lookup('env', 'AWS_ACCESS_KEY_ID') }}"
         AWS_SECRET_ACCESS_KEY: "{{ lookup('env', 'AWS_SECRET_ACCESS_KEY') }}"
 
-    - name: Stop existing container if running
-      command: docker stop thales-app
-      ignore_errors: yes
-
     - name: Remove existing container if exists
-      command: docker rm thales-app
+      command: docker rm -f thales-app
       ignore_errors: yes
 
     - name: Run Docker container
