@@ -41,6 +41,9 @@ jobs:
           exit-code: 0
           severity: CRITICAL,HIGH
 
+      - name: Install Datadog Ansible collection
+        run: ansible-galaxy collection install datadog.dd
+        
       - name: Deploy via Ansible
         env:
           EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
@@ -48,6 +51,7 @@ jobs:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+          DD_API_KEY: ${{ secrets.DD_API_KEY }}
         run: |
           pip install ansible
           echo "$EC2_SSH_KEY" > /tmp/deploy_key
@@ -59,5 +63,6 @@ jobs:
             -u ubuntu \
             -e "AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID" \
             -e "AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY" \
-            -e "AWS_ACCOUNT_ID=$AWS_ACCOUNT_ID"
+            -e "AWS_ACCOUNT_ID=$AWS_ACCOUNT_ID" \
+            -e "DD_API_KEY=$DD_API_KEY"
           rm -f /tmp/deploy_key  

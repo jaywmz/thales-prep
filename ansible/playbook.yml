@@ -49,6 +49,23 @@
         name: ubuntu
         groups: docker
         append: yes
+      
+    - name: Install Datadog agent
+      include_role:
+        name: datadog.dd.agent
+      vars:
+        datadog_api_key: "{{ lookup('env', 'DD_API_KEY') }}"
+        datadog_site: "datadoghq.com"
+        datadog_agent_version: "7"
+        datadog_config:
+          tags:
+            - "env:dev"
+            - "project:thales-prep"
+            - "owner:wmjay"
+        datadog_checks:
+          docker:
+            init_config:
+            instances: [{}]
 
     - name: Login to ECR
       shell: |
