@@ -97,4 +97,4 @@
       ignore_errors: yes
 
     - name: Run Docker container
-      command: docker run -d -p 8080:8080 --name thales-app {{ ecr_url }}/thales-app:latest
+      command: docker run -d -p 8080:8080 --name thales-app {{ ecr_url }}/thales-app:latest 
