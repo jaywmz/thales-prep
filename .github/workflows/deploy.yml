@@ -65,4 +65,4 @@ jobs:
             -e "AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY" \
             -e "AWS_ACCOUNT_ID=$AWS_ACCOUNT_ID" \
             -e "DD_API_KEY=$DD_API_KEY"
-          rm -f /tmp/deploy_key    
+          rm -f /tmp/deploy_key
