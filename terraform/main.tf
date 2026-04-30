@@ -73,13 +73,21 @@ resource "aws_security_group" "main" {
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = ["222.164.4.213/32"]
   }
 
   ingress {
     description = "HTTP"
     from_port   = 80
     to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    description = "HTTPS"
+    from_port   = 443
+    to_port     = 443
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
@@ -110,6 +118,60 @@ resource "aws_key_pair" "main" {
   public_key = file("~/.ssh/thales-prep.pub")
 }
 
+# IAM Role for EC2
+resource "aws_iam_role" "ec2_role" {
+  name = "thales-prep-ec2-role"
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "ec2.amazonaws.com"
+        }
+      }
+    ]
+  })
+  tags = {
+    Name = "thales-prep-ec2-role"
+  }
+}
+
+# IAM Policy - least privilege
+resource "aws_iam_role_policy" "ec2_policy" {
+  name = "thales-prep-ec2-policy"
+  role = aws_iam_role.ec2_role.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "ecr:GetAuthorizationToken",
+          "ecr:BatchCheckLayerAvailability",
+          "ecr:GetDownloadUrlForLayer",
+          "ecr:BatchGetImage"
+        ]
+        Resource = "*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "secretsmanager:GetSecretValue"
+        ]
+        Resource = aws_secretsmanager_secret.datadog_api_key.arn
+      }
+    ]
+  })
+}
+
+# Instance Profile
+resource "aws_iam_instance_profile" "ec2_profile" {
+  name = "thales-prep-ec2-profile"
+  role = aws_iam_role.ec2_role.name
+}
+
 # EC2 Instance
 resource "aws_instance" "main" {
   ami                    = "ami-0497a974f8d5dcef8"
@@ -117,7 +179,7 @@ resource "aws_instance" "main" {
   subnet_id              = aws_subnet.main.id
   vpc_security_group_ids = [aws_security_group.main.id]
   key_name               = aws_key_pair.main.key_name
-
+  iam_instance_profile   = aws_iam_instance_profile.ec2_profile.name
   tags = {
     Name = "thales-prep-ec2"
   }
@@ -144,6 +206,74 @@ resource "aws_ecr_repository" "main" {
 
   tags = {
     Name = "thales-prep-ecr"
+  }
+}
+
+# Secrets Manager
+resource "aws_secretsmanager_secret" "datadog_api_key" {
+  name                    = "thales-prep/datadog-api-key"
+  recovery_window_in_days = 0
+  tags = {
+    Name = "thales-prep-dd-key"
+  }
+}
+
+resource "aws_secretsmanager_secret_version" "datadog_api_key" {
+  secret_id     = aws_secretsmanager_secret.datadog_api_key.id
+  secret_string = var.dd_api_key
+}
+
+# CloudTrail S3 Bucket
+resource "aws_s3_bucket" "cloudtrail" {
+  bucket        = "thales-prep-cloudtrail-wmjay"
+  force_destroy = true
+  tags = {
+    Name = "thales-prep-cloudtrail"
+  }
+}
+
+resource "aws_s3_bucket_policy" "cloudtrail" {
+  bucket = aws_s3_bucket.cloudtrail.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "AWSCloudTrailAclCheck"
+        Effect = "Allow"
+        Principal = {
+          Service = "cloudtrail.amazonaws.com"
+        }
+        Action   = "s3:GetBucketAcl"
+        Resource = "arn:aws:s3:::thales-prep-cloudtrail-wmjay"
+      },
+      {
+        Sid    = "AWSCloudTrailWrite"
+        Effect = "Allow"
+        Principal = {
+          Service = "cloudtrail.amazonaws.com"
+        }
+        Action   = "s3:PutObject"
+        Resource = "arn:aws:s3:::thales-prep-cloudtrail-wmjay/AWSLogs/*"
+        Condition = {
+          StringEquals = {
+            "s3:x-amz-acl" = "bucket-owner-full-control"
+          }
+        }
+      }
+    ]
+  })
+}
+
+# CloudTrail
+resource "aws_cloudtrail" "main" {
+  name                          = "thales-prep-trail"
+  s3_bucket_name                = aws_s3_bucket.cloudtrail.id
+  include_global_service_events = true
+  is_multi_region_trail         = false
+  enable_logging                = true
+  depends_on                    = [aws_s3_bucket_policy.cloudtrail]
+  tags = {
+    Name = "thales-prep-trail"
   }
 }
 

@@ -97,4 +97,58 @@
       ignore_errors: yes
 
     - name: Run Docker container
-      command: docker run -d -p 8080:8080 --name thales-app {{ ecr_url }}/thales-app:latest 
+      command: docker run -d -p 8080:8080 --name thales-app {{ ecr_url }}/thales-app:latest
+
+    - name: Install nginx and openssl
+      apt:
+        name:
+          - nginx
+          - openssl
+        state: present
+
+    - name: Create self-signed SSL certificate
+      command: >
+        openssl req -x509 -nodes -days 365 -newkey rsa:2048
+        -keyout /etc/ssl/private/thales-prep.key
+        -out /etc/ssl/certs/thales-prep.crt
+        -subj "/C=SG/ST=Singapore/L=Singapore/O=thales-prep/CN=thales-prep"
+      args:
+        creates: /etc/ssl/certs/thales-prep.crt
+
+    - name: Configure nginx as reverse proxy
+      copy:
+        dest: /etc/nginx/sites-available/thales-app
+        content: |
+          server {
+              listen 80;
+              return 301 https://$host$request_uri;
+          }
+
+          server {
+              listen 443 ssl;
+              ssl_certificate /etc/ssl/certs/thales-prep.crt;
+              ssl_certificate_key /etc/ssl/private/thales-prep.key;
+
+              location / {
+                  proxy_pass http://localhost:8080;
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Real-IP $remote_addr;
+              }
+          }
+
+    - name: Enable nginx site
+      file:
+        src: /etc/nginx/sites-available/thales-app
+        dest: /etc/nginx/sites-enabled/thales-app
+        state: link
+
+    - name: Remove default nginx site
+      file:
+        path: /etc/nginx/sites-enabled/default
+        state: absent
+
+    - name: Restart nginx
+      service:
+        name: nginx
+        state: restarted
+        enabled: yes
